@@ -67,8 +67,15 @@ public class Discovery : MonoBehaviour
     {
         if(Clients.currentAdapter != null)
         {
-            Debug.Log($"Sending broadcast to {Clients.currentAdapter.Item2}");
-            await Clients.currentAdapter.Item1.SendAsync(RequestData, RequestData.Length, Clients.currentAdapter.Item2);
+            for(byte i = 1; i < 255; i++)
+            {
+                byte[] ipBytes = Clients.currentAdapter.Item2.Address.GetAddressBytes();
+                ipBytes[3] = i;
+                IPAddress addr = new(ipBytes);
+                IPEndPoint ep = new IPEndPoint(addr, BroadcastPort);
+                Debug.Log($"Sending broadcast to {ep} from {Clients.currentAdapter.Item1.Client.LocalEndPoint}");
+                await Clients.currentAdapter.Item1.SendAsync(RequestData, RequestData.Length, ep);
+            }
         }
         else
         {
