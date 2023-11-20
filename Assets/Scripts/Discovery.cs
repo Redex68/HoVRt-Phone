@@ -20,8 +20,6 @@ public class Discovery : MonoBehaviour
         RequestData = Encoding.ASCII.GetBytes(Request);
         ReadAdapters();
         adaptersDropdown.onValueChanged.AddListener(SetAdapter);
-
-        BroadcastResponseListen();
     }
 
     private void ReadAdapters()
@@ -29,19 +27,20 @@ public class Discovery : MonoBehaviour
         IPHostEntry hostEntry=Dns.GetHostEntry(Dns.GetHostName());
         foreach (IPAddress ip in hostEntry.AddressList) {
             if (ip.AddressFamily==AddressFamily.InterNetwork) {
-                UdpClient tmp = new UdpClient(new IPEndPoint(ip, BroadcastPort))
+                UdpClient newClient = new UdpClient(new IPEndPoint(ip, BroadcastPort))
                 {
                     EnableBroadcast = true,
                 };
-                tmp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
-                tmp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.DontRoute, 1);
-                tmp.Client.ReceiveTimeout = 1000;
+                newClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
+                newClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.DontRoute, 1);
+                newClient.Client.ReceiveTimeout = 1000;
 
                 Clients.adapterAddresses.Add(ip);
                 byte[] ipBytes = ip.GetAddressBytes();
                 ipBytes[3] = 255;
-                IPEndPoint ep = new IPEndPoint(new IPAddress(ipBytes), BroadcastPort);
-                Clients.adapters.Add(ip, new Tuple<UdpClient, IPEndPoint>(tmp, ep));
+                IPEndPoint ep = new(new IPAddress(ipBytes), BroadcastPort);
+                Clients.adapters.Add(ip, new Tuple<UdpClient, IPEndPoint>(newClient, ep));
+                BroadcastResponseListen(newClient);
             }
         }
 
@@ -63,7 +62,7 @@ public class Discovery : MonoBehaviour
         BroadcastRequestAsync();
     }
 
-    private async void BroadcastRequestAsync()
+    private void BroadcastRequestAsync()
     {
         if(Clients.currentAdapter != null)
         {
@@ -74,7 +73,7 @@ public class Discovery : MonoBehaviour
                 IPAddress addr = new(ipBytes);
                 IPEndPoint ep = new IPEndPoint(addr, BroadcastPort);
                 Debug.Log($"Sending broadcast to {ep} from {Clients.currentAdapter.Item1.Client.LocalEndPoint}");
-                await Clients.currentAdapter.Item1.SendAsync(RequestData, RequestData.Length, ep);
+                _ = Clients.currentAdapter.Item1.SendAsync(RequestData, RequestData.Length, ep);
             }
         }
         else
@@ -84,14 +83,14 @@ public class Discovery : MonoBehaviour
     }
 
 /// <summary> Listens on the currently selected adapter for a response to a broadcast request. </summary>
-    private async void BroadcastResponseListen()
+    private async void BroadcastResponseListen(UdpClient client)
     {
         while(true)
         {
             try
             {
                 Debug.Log("Awaiting");
-                UdpReceiveResult result = await Clients.currentAdapter.Item1.ReceiveAsync();
+                UdpReceiveResult result = await client.ReceiveAsync();
                 string response = Encoding.ASCII.GetString(result.Buffer);
 
                 Debug.Log($"Server: {result.RemoteEndPoint}");
@@ -105,13 +104,12 @@ public class Discovery : MonoBehaviour
 
                 if(!Clients.serverAddresses.Contains(ip))
                 {
-                    UdpClient serverClient = new UdpClient();
+                    UdpClient serverClient = new();
                     serverClient.Connect(ip, port);
 
                     Clients.serverAddresses.Add(ip);
                     Clients.servers.Add(ip, serverClient);
-                    if(Clients.currentServer == null)
-                        Clients.currentServer = serverClient;
+                    Clients.currentServer ??= serverClient;
                     
                     result.RemoteEndPoint.Port = port;
                     serverFound.Invoke(result);
