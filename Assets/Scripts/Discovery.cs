@@ -22,6 +22,7 @@ public class Discovery : MonoBehaviour
         adaptersDropdown.onValueChanged.AddListener(SetAdapter);
     }
 
+/// <summary> Finds all of the device's network adapters and adds them to the Clients.adapters and Clients.adapterAddresses lists </summary>
     private void ReadAdapters()
     {
         IPHostEntry hostEntry=Dns.GetHostEntry(Dns.GetHostName());
@@ -62,6 +63,8 @@ public class Discovery : MonoBehaviour
         BroadcastRequestAsync();
     }
 
+/// <summary> Broadcast at home - couldn't get actual broadcasting to work correctly so this
+/// just sends a packet to every IP address in the LAN </summary>
     private void BroadcastRequestAsync()
     {
         if(Clients.currentAdapter != null)
@@ -82,7 +85,7 @@ public class Discovery : MonoBehaviour
         }
     }
 
-/// <summary> Listens on the currently selected adapter for a response to a broadcast request. </summary>
+/// <summary> Listens on the adapter passed for a response to a broadcast request. </summary>
     private async void BroadcastResponseListen(UdpClient client)
     {
         while(true)
